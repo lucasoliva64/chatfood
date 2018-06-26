@@ -39,11 +39,11 @@ var bot = new builder.UniversalBot(connector, function (session, args) {
     session.send('You reached the default message handler. You said \'%s\'.', session.message.text);
 });
 
-bot.set('storage', tableStorage);
+
 
 // Make sure you add code to validate these fields
-var luisAppId = process.env.LuisAppId;
-var luisAPIKey = process.env.LuisAPIKey;
+var luisAppId = 'bd08769c-a58d-43d9-9d3a-79c9465eab84';
+var luisAPIKey = '4174532c4d014347a6d7c14ca1c1f8cb';
 var luisAPIHostName = process.env.LuisAPIHostName || 'westus.api.cognitive.microsoft.com';
 
 const LuisModelUrl = 'https://' + luisAPIHostName + '/luis/v2.0/apps/' + luisAppId + '?subscription-key=' + luisAPIKey;
@@ -54,30 +54,30 @@ bot.recognizer(recognizer);
 
 // Add a dialog for each intent that the LUIS app recognizes.
 // See https://docs.microsoft.com/en-us/bot-framework/nodejs/bot-builder-nodejs-recognize-intent-luis 
-bot.dialog('GreetingDialog',
+bot.dialog('CumprimentoDialog',
     (session) => {
-        session.send('You reached the Greeting intent. You said \'%s\'.', session.message.text);
+        session.send('You reached the Cumprimento intent. You said \'%s\'.', session.message.text);
         session.endDialog();
     }
 ).triggerAction({
-    matches: 'Greeting'
+    matches: 'Cumprimento'
 })
 
-bot.dialog('HelpDialog',
+bot.dialog('CardapioDialog',
     (session) => {
-        session.send('You reached the Help intent. You said \'%s\'.', session.message.text);
+        session.send('You reached the Help Cardapio. You said \'%s\'.', session.message.text);
         session.endDialog();
     }
 ).triggerAction({
-    matches: 'Help'
+    matches: 'Cardapio'
 })
 
-bot.dialog('CancelDialog',
+bot.dialog('AtendimentoDialog',
     (session) => {
-        session.send('You reached the Cancel intent. You said \'%s\'.', session.message.text);
+        session.send('You reached the Atendimento intent. You said \'%s\'.', session.message.text);
         session.endDialog();
     }
 ).triggerAction({
-    matches: 'Cancel'
+    matches: 'Atendimento'
 })
 
