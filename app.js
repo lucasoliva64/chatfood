@@ -5,22 +5,26 @@ A simple Language Understanding (LUIS) bot for the Microsoft Bot Framework.
 var restify = require('restify');
 var builder = require('botbuilder');
 var botbuilder_azure = require("botbuilder-azure");
+var mongoose = require('mongoose');
+
 
 // Setup Restify Server
 var server = restify.createServer();
 server.listen(process.env.port || process.env.PORT || 3978, function () {
-   console.log('%s listening to %s', server.name, server.url); 
+    console.log('%s listening to %s', server.name, server.url);
 });
-  
+
 // Create chat connector for communicating with the Bot Framework Service
 var connector = new builder.ChatConnector({
     appId: process.env.MicrosoftAppId,
     appPassword: process.env.MicrosoftAppPassword,
-    openIdMetadata: process.env.BotOpenIdMetadata 
+    openIdMetadata: process.env.BotOpenIdMetadata
 });
 
 // Listen for messages from users 
 server.post('/api/messages', connector.listen());
+
+mongoose.connect('mongodb://admin:NodeMongo123@ds018538.mlab.com:18538/chatfood');
 
 /*----------------------------------------------------------------------------------------
 * Bot Storage: This is a great spot to register the private state storage for your bot. 
@@ -29,8 +33,11 @@ server.post('/api/messages', connector.listen());
 * ---------------------------------------------------------------------------------------- */
 
 var tableName = 'botdata';
-var azureTableClient = new botbuilder_azure.AzureTableClient(tableName, process.env['AzureWebJobsStorage']);
+var storageName = "chatfoodfatec"; // Obtain from Azure Portal
+var storageKey = "NtqbjIc0wjvIrKpUffNbYajFTz8/Pemyzg4MftY2zQhIdDk7JVZw7D7wVpmpZ1HdpTVJf6DGDWyBC8SG3Fm7VQ=="; // Obtain from Azure Portal
+var azureTableClient = new botbuilder_azure.AzureTableClient(tableName, storageName, storageKey);
 var tableStorage = new botbuilder_azure.AzureBotStorage({ gzipData: false }, azureTableClient);
+
 
 // Create your bot with a function to receive messages from the user
 // This default message handler is invoked if the user's utterance doesn't
@@ -39,6 +46,20 @@ var bot = new builder.UniversalBot(connector, function (session, args) {
     session.send('You reached the default message handler. You said \'%s\'.', session.message.text);
 });
 
+
+var db = mongoose.connection;
+db.on('error', console.error.bind(console, 'connection error:'));
+db.once('open', function () {
+
+});
+var Schema = mongoose.Schema;
+var estabelecimentoSchema = new Schema({
+    nome: String
+}, { collection: 'estabelecimento' });
+
+var categoriasSchema = new Schema({
+    nome: String
+}, { collection: 'categorias' });
 
 
 // Make sure you add code to validate these fields
@@ -52,12 +73,19 @@ const LuisModelUrl = 'https://' + luisAPIHostName + '/luis/v2.0/apps/' + luisApp
 var recognizer = new builder.LuisRecognizer(LuisModelUrl);
 bot.recognizer(recognizer);
 
+bot.set('storage', new builder.MemoryBotStorage())
+
 // Add a dialog for each intent that the LUIS app recognizes.
 // See https://docs.microsoft.com/en-us/bot-framework/nodejs/bot-builder-nodejs-recognize-intent-luis 
 bot.dialog('CumprimentoDialog',
     (session) => {
-        session.send('You reached the Cumprimento intent. You said \'%s\'.', session.message.text);
-        session.endDialog();
+        var estabelecimentoModel = mongoose.model('Estabelecimento', estabelecimentoSchema);
+        estabelecimentoModel.findOne({ nome: 'Zappa' }, 'nome', (function (err, estabelecimento) {
+            if (err) return console.error(err);
+            session.send('Olá, Bem-Vindo ao \'%s\'.', estabelecimento.nome);
+            console.log();
+            session.endDialog();
+        }));
     }
 ).triggerAction({
     matches: 'Cumprimento'
@@ -65,11 +93,39 @@ bot.dialog('CumprimentoDialog',
 
 bot.dialog('CardapioDialog',
     (session) => {
-        session.send('You reached the Help Cardapio. You said \'%s\'.', session.message.text);
-        session.endDialog();
+
+        var Categorias = [];
+        var categoriasModel = mongoose.model('Categorias', categoriasSchema);
+        categoriasModel.find({}, 'nome', (function (err, categorias) {
+            if (err) return console.error(err);
+            categorias.forEach(categoria => {
+                Categorias.push(categoria.nome);
+            });
+            builder.Prompts.choice(
+                session,
+                "Temos no Cardapio as seguintes categorias:",
+                Categorias
+            );
+
+        }));
+    },
+    (session, results) => {
+        session.userData.categoria = results.response;
+        session.send('Você não chegou no dialogo do produto: \'%s\' ', session.userData.categoria);
+        session.beginDialog('ProdutoDialog');
     }
 ).triggerAction({
     matches: 'Cardapio'
+})
+
+bot.dialog('ProdutoDialog',
+    (session) => {
+        session.send('Você chegou no dialogo do produto \'%s\'.', session.message.text);
+        session.send('Você chegou no dialogo do produto: \'%s\' ', session.userData.categoria);
+        session.endDialog();
+    }
+).triggerAction({
+    matches: 'Produto'
 })
 
 bot.dialog('AtendimentoDialog',
