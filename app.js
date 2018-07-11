@@ -27,16 +27,18 @@ server.post('/api/messages', connector.listen());
 mongoose.connect('mongodb://admin:NodeMongo123@ds018538.mlab.com:18538/chatfood');
 
 /*----------------------------------------------------------------------------------------
-* Bot Storage: This is a great spot to register the private state storage for your bot. 
-* We provide adapters for Azure Table, CosmosDb, SQL Azure, or you can implement your own!
-* For samples and documentation, see: https://github.com/Microsoft/BotBuilder-Azure
-* ---------------------------------------------------------------------------------------- */
+ * Bot Storage: This is a great spot to register the private state storage for your bot. 
+ * We provide adapters for Azure Table, CosmosDb, SQL Azure, or you can implement your own!
+ * For samples and documentation, see: https://github.com/Microsoft/BotBuilder-Azure
+ * ---------------------------------------------------------------------------------------- */
 
 var tableName = 'botdata';
 var storageName = "chatfoodfatec"; // Obtain from Azure Portal
 var storageKey = "NtqbjIc0wjvIrKpUffNbYajFTz8/Pemyzg4MftY2zQhIdDk7JVZw7D7wVpmpZ1HdpTVJf6DGDWyBC8SG3Fm7VQ=="; // Obtain from Azure Portal
 var azureTableClient = new botbuilder_azure.AzureTableClient(tableName, storageName, storageKey);
-var tableStorage = new botbuilder_azure.AzureBotStorage({ gzipData: false }, azureTableClient);
+var tableStorage = new botbuilder_azure.AzureBotStorage({
+    gzipData: false
+}, azureTableClient);
 
 
 // Create your bot with a function to receive messages from the user
@@ -55,11 +57,17 @@ db.once('open', function () {
 var Schema = mongoose.Schema;
 var estabelecimentoSchema = new Schema({
     nome: String
-}, { collection: 'estabelecimento' });
+}, {
+    collection: 'estabelecimento'
+});
 
 var categoriasSchema = new Schema({
-    nome: String
-}, { collection: 'categorias' });
+    nome: String,
+    imagem: String,
+    sinonimos: Array
+}, {
+    collection: 'categorias'
+});
 
 
 // Make sure you add code to validate these fields
@@ -80,7 +88,9 @@ bot.set('storage', new builder.MemoryBotStorage())
 bot.dialog('CumprimentoDialog',
     (session) => {
         var estabelecimentoModel = mongoose.model('Estabelecimento', estabelecimentoSchema);
-        estabelecimentoModel.findOne({ nome: 'Zappa' }, 'nome', (function (err, estabelecimento) {
+        estabelecimentoModel.findOne({
+            nome: 'lepingue'
+        }, 'nome', (function (err, estabelecimento) {
             if (err) return console.error(err);
             session.send('Olá, Bem-Vindo ao \'%s\'.', estabelecimento.nome);
             console.log();
@@ -91,28 +101,15 @@ bot.dialog('CumprimentoDialog',
     matches: 'Cumprimento'
 })
 
-bot.dialog('CardapioDialog',
+bot.dialog('CardapioDialog', 
     (session) => {
+        
+        var cards = getCategorias();
+        var reply = new builder.Message(session)
+        .attachmentLayout(builder.AttachmentLayout.carousel)
+        .attachments(cards);
+        session.send(reply);
 
-        var Categorias = [];
-        var categoriasModel = mongoose.model('Categorias', categoriasSchema);
-        categoriasModel.find({}, 'nome', (function (err, categorias) {
-            if (err) return console.error(err);
-            categorias.forEach(categoria => {
-                Categorias.push(categoria.nome);
-            });
-            builder.Prompts.choice(
-                session,
-                "Temos no Cardapio as seguintes categorias:",
-                Categorias
-            );
-
-        }));
-    },
-    (session, results) => {
-        session.userData.categoria = results.response;
-        session.send('Você não chegou no dialogo do produto: \'%s\' ', session.userData.categoria);
-        session.beginDialog('ProdutoDialog');
     }
 ).triggerAction({
     matches: 'Cardapio'
@@ -120,9 +117,14 @@ bot.dialog('CardapioDialog',
 
 bot.dialog('ProdutoDialog',
     (session) => {
-        session.send('Você chegou no dialogo do produto \'%s\'.', session.message.text);
-        session.send('Você chegou no dialogo do produto: \'%s\' ', session.userData.categoria);
-        session.endDialog();
+        session.send('You reached the Produto intent. You said \'%s\'.', session.message.text);
+        var cards = getCardsAttachments();
+        var reply = new builder.Message(session)
+        .attachmentLayout(builder.AttachmentLayout.carousel)
+        .attachments(cards);
+
+    session.send(reply);
+
     }
 ).triggerAction({
     matches: 'Produto'
@@ -137,3 +139,24 @@ bot.dialog('AtendimentoDialog',
     matches: 'Atendimento'
 })
 
+
+
+function getCategorias(session) {
+    Categorias = [];
+    var categoriasModel = mongoose.model('Categorias', categoriasSchema);
+    categoriasModel.find({}, (function (err, categorias) {
+        if (err) return console.error(err);
+        categorias.forEach(categoria => {
+            Categorias.push(
+                new builder.HeroCard(session)
+                .title(categoria.nome)
+                .subtitle('Offload the heavy lifting of data center management')
+                .images(
+                    builder.CardImage.create(session, categoria.imagem)
+                )
+            );
+        });
+        console.log(Categorias)
+        return Categorias
+    }));
+}
