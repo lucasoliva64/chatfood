@@ -161,7 +161,7 @@ bot.dialog('ProdutoDialog',
 
     }
 ).triggerAction({
-    matches: 'Produto'
+    matches: db.getCollection('produtos').find({})
 })
 
 bot.dialog('AtendimentoDialog',
