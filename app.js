@@ -1,3 +1,5 @@
+require('dotenv-extended').load();
+
 var restify = require('restify');
 var builder = require('botbuilder');
 var botbuilder_azure = require("botbuilder-azure");
@@ -19,22 +21,7 @@ var connector = new builder.ChatConnector({
 
 // Listen for messages from users 
 server.post('/api/messages', connector.listen());
-
-mongoose.connect('mongodb://admin:NodeMongo123@ds018538.mlab.com:18538/chatfood');
-
-/*----------------------------------------------------------------------------------------
- * Bot Storage: This is a great spot to register the private state storage for your bot. 
- * We provide adapters for Azure Table, CosmosDb, SQL Azure, or you can implement your own!
- * For samples and documentation, see: https://github.com/Microsoft/BotBuilder-Azure
- * ---------------------------------------------------------------------------------------- */
-
-var tableName = 'botdata';
-var storageName = "chatfoodfatec"; // Obtain from Azure Portal
-var storageKey = "NtqbjIc0wjvIrKpUffNbYajFTz8/Pemyzg4MftY2zQhIdDk7JVZw7D7wVpmpZ1HdpTVJf6DGDWyBC8SG3Fm7VQ=="; // Obtain from Azure Portal
-var azureTableClient = new botbuilder_azure.AzureTableClient(tableName, storageName, storageKey);
-var tableStorage = new botbuilder_azure.AzureBotStorage({
-    gzipData: false
-}, azureTableClient);
+mongoose.connect(process.env.mongo_db);
 
 
 // Create your bot with a function to receive messages from the user
@@ -64,14 +51,16 @@ var categoriasSchema = new Schema({
 }, {
     collection: 'categorias'
 });
+var produtoSchema = new Schema({
+    nome: String,
+    sinonimos: Array,
+    categorias: Array
+}, {
+    collection: 'produtos'
+});
 
 
-// Make sure you add code to validate these fields
-var luisAppId = 'bd08769c-a58d-43d9-9d3a-79c9465eab84';
-var luisAPIKey = '4174532c4d014347a6d7c14ca1c1f8cb';
-var luisAPIHostName = process.env.LuisAPIHostName || 'westus.api.cognitive.microsoft.com';
-
-const LuisModelUrl = 'https://' + luisAPIHostName + '/luis/v2.0/apps/' + luisAppId + '?subscription-key=' + luisAPIKey;
+const LuisModelUrl = process.env.LUIS_MODEL_URL;
 
 // Create a recognizer that gets intents from LUIS, and add it to the bot
 var recognizer = new builder.LuisRecognizer(LuisModelUrl);
@@ -81,25 +70,34 @@ bot.set('storage', new builder.MemoryBotStorage())
 
 // Add a dialog for each intent that the LUIS app recognizes.
 // See https://docs.microsoft.com/en-us/bot-framework/nodejs/bot-builder-nodejs-recognize-intent-luis 
-bot.dialog('CumprimentoDialog',
+bot.dialog('CumprimentoDialog', [
     (session) => {
+        var lepingue = 'lepingue'
+        console.log(new RegExp(lepingue,'i'));
         var estabelecimentoModel = mongoose.model('Estabelecimento', estabelecimentoSchema);
         estabelecimentoModel.findOne({
-            nome: /lepingue/
+            nome: new RegExp(lepingue,'i')
         }, 'nome', (function (err, estabelecimento) {
             if (err) return console.error(err);
-            session.send('Olá, Bem-Vindo ao \'%s\'.', estabelecimento.nome);
-            console.log();
-            session.endDialog();
+            session.send('Olá, Bem-Vindo a %s.', estabelecimento.nome);
+            builder.Prompts.text(session, 'Qual o seu Nome?')
         }));
+    },
+    (session, results) => {
+        session.userData.nome = results.response;
+        session.send('Em que posso te ajudar %s.', session.userData.nome +
+            '\nEu Posso fazer essas coisas: \n' +
+            'Te mostrar o Cardapio \n' +
+            'Chamar um Garçom'
+        );
+
     }
-).triggerAction({
+]).triggerAction({
     matches: 'Cumprimento'
 })
 
-bot.dialog('CardapioDialog',
+bot.dialog('CardapioDialog',[
     (session) => {
-
         var categoriasModel = mongoose.model('Categorias', categoriasSchema);
         categoriasModel.find({}, (function (err, categorias) {
             if (err) return console.error(err);
@@ -111,10 +109,9 @@ bot.dialog('CardapioDialog',
                     .subtitle('Offload the heavy lifting of data center management')
                     .images([
                         builder.CardImage.create(session, categoria.imagem)
-                    ]
-                    )
+                    ])
                     .buttons([
-                        builder.CardAction.openUrl(session, 'https://azure.microsoft.com/en-us/services/documentdb/', 'Learn More')
+                        builder.CardAction.imBack(session, categoria.nome, 'Saiba Mais')
                     ])
                 );
             });
@@ -122,22 +119,45 @@ bot.dialog('CardapioDialog',
                 .attachmentLayout(builder.AttachmentLayout.carousel)
                 .attachments(cards);
             session.send(reply);
+            builder.Prompts.text(session, 'Escolha uma categoria');
+            
         }));
+    },
+    (session, results) =>{
+        console.log(results.response);
+        var produtoModel = mongoose.model('Produto', produtoSchema);
+        produtoModel.find({
+            categorias: new RegExp(results.response, 'i')
+        }, 'nome', (function (err, produtos) {
+            produtos.forEach(produto =>{
+                console.log(produto.nome);
+                session.send('temos %s no cardapio', produto.nome);
+            })
 
+        }));
     }
+
+]
 ).triggerAction({
     matches: 'Cardapio'
 })
 
 bot.dialog('ProdutoDialog',
-    (session) => {
-        session.send('You reached the Produto intent. You said \'%s\'.', session.message.text);
-        var cards = getCardsAttachments();
-        var reply = new builder.Message(session)
-            .attachmentLayout(builder.AttachmentLayout.carousel)
-            .attachments(cards);
+    (session, args) => {;
+        var entityProduto = args.intent.entities[0].entity;
 
-        session.send(reply);
+
+        var produtoModel = mongoose.model('Produto', produtoSchema);
+        produtoModel.find({
+            nome: new RegExp(entityProduto, 'i')
+        }, 'nome', (function (err, produtos) {
+            produtos.forEach(produto =>{
+                console.log(produto.nome);
+                session.send('temos %s no cardapio', produto.nome);
+            })
+
+        }));
+
 
     }
 ).triggerAction({

@@ -6,6 +6,7 @@
   "dependencies": {
     "botbuilder": "^3.13.1",
     "botbuilder-azure": "^3.0.4",
+    "dotenv-extended": "^2.0.2",
     "mongoose": "^5.1.7",
     "restify": "^5.0.0"
   },
