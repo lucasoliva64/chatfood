@@ -114,7 +114,10 @@ bot.dialog('CardapioDialog',
                     ]
                     )
                     .buttons([
-                        builder.CardAction.openUrl(session, 'https://azure.microsoft.com/en-us/services/documentdb/', 'Learn More')
+                        
+                        builder.CardAction.imBack(session, categoria.nome, 'Saiba Mais')
+                        
+                        
                     ])
                 );
             });
@@ -131,7 +134,7 @@ bot.dialog('CardapioDialog',
 
 bot.dialog('ProdutoDialog',
     (session) => {
-        session.send('You reached the Produto intent. You said \'%s\'.', session.message.text);
+        session.send('ProdutoDialog You reached the Produto intent. You said \'%s\'.', session.message.text);
         var cards = getCardsAttachments();
         var reply = new builder.Message(session)
             .attachmentLayout(builder.AttachmentLayout.carousel)
@@ -141,7 +144,7 @@ bot.dialog('ProdutoDialog',
 
     }
 ).triggerAction({
-    matches: 'Produto'
+    matches: db.getCollection('produtos').find({})
 })
 
 bot.dialog('AtendimentoDialog',
