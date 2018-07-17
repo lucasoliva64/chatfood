@@ -4,6 +4,10 @@ var restify = require('restify');
 var builder = require('botbuilder');
 var botbuilder_azure = require("botbuilder-azure");
 var mongoose = require('mongoose');
+const Produto = require('./model/produto');
+const Categoria = require('./model/categoria');
+const Estabelecimento = require('./model/estabelecimento')
+
 
 
 // Setup Restify Server
@@ -19,47 +23,30 @@ var connector = new builder.ChatConnector({
     openIdMetadata: process.env.BotOpenIdMetadata
 });
 
+// Criação e teste da conexão com banco de dados
+var db = mongoose.connection;
+db.on('error', console.error.bind(console, `connection error:`));
+db.once('open', function () {});
+
+mongoose.connect(process.env.mongo_db);
+
+
+
+
 // Listen for messages from users 
 server.post('/api/messages', connector.listen());
-mongoose.connect(process.env.mongo_db);
 
 
 // Create your bot with a function to receive messages from the user
 // This default message handler is invoked if the user's utterance doesn't
+
 // match any intents handled by other dialogs.
 var bot = new builder.UniversalBot(connector, function (session, args) {
-    session.send('You reached the default message handler. You said \'%s\'.', session.message.text);
+    session.send('Não entendi o que quis dizer com \'%s\'. \n Tente alguma dessas coisas:\nPedir atendimento\nVer Cardapio\nSaber mais sobre o estabelecimento\nRealizar pedido ', session.message.text);
 });
 
 
-var db = mongoose.connection;
-db.on('error', console.error.bind(console, 'connection error:'));
-db.once('open', function () {
-
-});
-var Schema = mongoose.Schema;
-var estabelecimentoSchema = new Schema({
-    nome: String
-}, {
-    collection: 'estabelecimento'
-});
-
-var categoriasSchema = new Schema({
-    nome: String,
-    imagem: String,
-    sinonimos: Array
-}, {
-    collection: 'categorias'
-});
-var produtoSchema = new Schema({
-    nome: String,
-    sinonimos: Array,
-    categorias: Array
-}, {
-    collection: 'produtos'
-});
-
-
+// LINK com o luis
 const LuisModelUrl = process.env.LUIS_MODEL_URL;
 
 // Create a recognizer that gets intents from LUIS, and add it to the bot
@@ -73,10 +60,10 @@ bot.set('storage', new builder.MemoryBotStorage())
 bot.dialog('CumprimentoDialog', [
     (session) => {
         var lepingue = 'lepingue'
-        console.log(new RegExp(lepingue,'i'));
-        var estabelecimentoModel = mongoose.model('Estabelecimento', estabelecimentoSchema);
-        estabelecimentoModel.findOne({
-            nome: new RegExp(lepingue,'i')
+        console.log(new RegExp(lepingue, 'i'));
+
+        Estabelecimento.findOne({
+            nome: new RegExp(lepingue, 'i')
         }, 'nome', (function (err, estabelecimento) {
             if (err) return console.error(err);
             session.send('Olá, Bem-Vindo a %s.', estabelecimento.nome);
@@ -85,87 +72,71 @@ bot.dialog('CumprimentoDialog', [
     },
     (session, results) => {
         session.userData.nome = results.response;
-        session.send('Em que posso te ajudar %s.', session.userData.nome +
-            '\nEu Posso fazer essas coisas: \n' +
-            'Te mostrar o Cardapio \n' +
-            'Chamar um Garçom'
-        );
-
+        session.send(`Em que posso te ajudar, ${session.userData.nome} 
+            Eu Posso fazer essas coisas:
+                * Te mostrar o Cardapio 
+                * Chamar um Garçom`);
+        session.beginDialog("PedidoDialog")
     }
 ]).triggerAction({
     matches: 'Cumprimento'
 })
-
-bot.dialog('CardapioDialog',[
-    (session) => {
-        var categoriasModel = mongoose.model('Categorias', categoriasSchema);
-        categoriasModel.find({}, (function (err, categorias) {
-            if (err) return console.error(err);
-            var cards = [];
-            categorias.forEach(categoria => {
-                cards.push(
-                    new builder.HeroCard(session)
-                    .title(categoria.nome)
-                    .subtitle('Offload the heavy lifting of data center management')
-                    .images([
-                        builder.CardImage.create(session, categoria.imagem)
-                    ])
-                    .buttons([
-                        builder.CardAction.imBack(session, categoria.nome, 'Saiba Mais')
-                    ])
-                );
-            });
-            var reply = new builder.Message(session)
-                .attachmentLayout(builder.AttachmentLayout.carousel)
-                .attachments(cards);
-            session.send(reply);
-            builder.Prompts.text(session, 'Escolha uma categoria');
-            
-        }));
-    },
-    (session, results) =>{
-        console.log(results.response);
-        var produtoModel = mongoose.model('Produto', produtoSchema);
-        produtoModel.find({
-            categorias: new RegExp(results.response, 'i')
-        }, 'nome', (function (err, produtos) {
-            produtos.forEach(produto =>{
-                console.log(produto.nome);
-                session.send('temos %s no cardapio', produto.nome);
+bot.dialog('PedidoDialog', [
+    (session, args, next) => {
+        if (session.userData.nome == null) {
+            builder.Prompts.text(session, 'Qual o seu Nome?')
+        } else {
+            next({
+                response: session.userData.nome
             })
+        }
+    },
+    (session, results, next) => {
+        session.userData.nome = results.response;
+        if (session.userData.mesa == null) {
+            builder.Prompts.text(session, 'Poderia me informar qual a sua mesa?');
+        } else {
+            next();
+        }
+    },
+    (session, results, next) => {
+        if (session.userData.mesa == null) {
+            session.userData.mesa = results.response;
+        }
 
-        }));
+        buscaCategoria(session)
+
+
     }
 
-]
+]).triggerAction({
+    matches: 'Pedido'
+})
+
+bot.dialog('CardapioDialog', 
+    (session, args, next) => {
+        buscaCategoria(session)
+     }
 ).triggerAction({
     matches: 'Cardapio'
 })
 
 bot.dialog('ProdutoDialog',
-    (session, args) => {;
-        var entityProduto = args.intent.entities[0].entity;
-
-
-        var produtoModel = mongoose.model('Produto', produtoSchema);
-        produtoModel.find({
-            nome: new RegExp(entityProduto, 'i')
-        }, 'nome', (function (err, produtos) {
-            produtos.forEach(produto =>{
-                console.log(produto.nome);
-                session.send('temos %s no cardapio', produto.nome);
-            })
-
-        }));
-
-
+    (session, args) => {
+        var produtoEntity = builder.EntityRecognizer.findEntity(args.intent.entities, 'produto');
+        if (produtoEntity) {
+            buscaProdutos(session, produtoEntity.entity);
+        }else{
+            buscaCategoria(session)
+        }
     }
 ).triggerAction({
-    matches: db.getCollection('produtos').find({})
+    matches: "Produto"
 })
 
 bot.dialog('AtendimentoDialog',
     (session) => {
+        
         session.send('You reached the Atendimento intent. You said \'%s\'.', session.message.text);
         session.endDialog();
     }
@@ -174,7 +145,63 @@ bot.dialog('AtendimentoDialog',
 })
 
 
-function cardsCategorias(categorias) {
-
-    return cards
+const buscaCategoria = (session) => {
+    Categoria.find({}).then(categorias => {
+        var cards = [];
+        categorias.forEach(categoria => {
+            cards.push(
+                new builder.HeroCard(session)
+                .title(categoria.nome)
+                .subtitle('Offload the heavy lifting of data center management')
+                .images([
+                    builder.CardImage.create(session, categoria.imagem)
+                ])
+                .buttons([
+                    builder.CardAction.imBack(session, `Produtos da categoria ${categoria.nome}`, 'Veja os Produtos')
+                ])
+            );
+        });
+        var reply = new builder.Message(session)
+            .attachmentLayout(builder.AttachmentLayout.carousel)
+            .attachments(cards);
+        session.send(reply);
+        
+    }).catch(err => (console.log(err)));
 }
+
+
+const buscaProdutos = (session, text) => {
+    Produto.find({})
+        .or([{
+            nome: new RegExp(text, 'i')
+        }, {
+            categoria: new RegExp(text, 'i')
+        }, {
+            sinonimos: new RegExp(text, 'i')
+        }])
+        .then(produtos => {
+            var cards = [];
+            console.log(produtos)
+            if(produtos.length > 0){
+                produtos.forEach(produto => {
+                    cards.push(
+                        new builder.HeroCard(session)
+                        .title(produto.nome)
+                        .subtitle('Offload the heavy lifting of data center management')
+                        .images([
+                            builder.CardImage.create(session, produto.imagem)
+                        ])
+                    );
+                });
+                var reply = new builder.Message(session)
+                    .attachmentLayout(builder.AttachmentLayout.carousel)
+                    .attachments(cards);
+                session.send(reply);
+            }else{
+                session.send(`Não encontramos nenhum produto com ${text}, tente navegar nas 'Categorias'`)
+            }
+
+
+        }).catch(err => (console.log("console Lucas err" + err)));
+}
+
