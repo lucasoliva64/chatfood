@@ -7,7 +7,7 @@ var mongoose = require('mongoose');
 const Produto = require('./model/produto');
 const Categoria = require('./model/categoria');
 const Estabelecimento = require('./model/estabelecimento')
-
+const Mesas = require('./model/mesas');
 
 
 // Setup Restify Server
@@ -103,20 +103,30 @@ bot.dialog('PedidoDialog', [
         if (session.userData.mesa == null) {
             session.userData.mesa = results.response;
         }
+        console.log(session.userData.mesa);
+    
+        Mesas.findOne({key: session.userData.mesa}).then(mesa =>{
+            console.log(mesa)
+            if(mesa.status == 0 || mesa.nome == session.userData.nome){             
+                console.log('update nome');
+                buscaCategoria(session);
+                next();
+            }else{
+                session.send(`Entre com uma mesa valida e dísponivel`);
+            }
+        })
 
-        buscaCategoria(session)
-
-
+  
     }
 
 ]).triggerAction({
     matches: 'Pedido'
 })
 
-bot.dialog('CardapioDialog', 
+bot.dialog('CardapioDialog',
     (session, args, next) => {
         buscaCategoria(session)
-     }
+    }
 ).triggerAction({
     matches: 'Cardapio'
 })
@@ -126,7 +136,7 @@ bot.dialog('ProdutoDialog',
         var produtoEntity = builder.EntityRecognizer.findEntity(args.intent.entities, 'produto');
         if (produtoEntity) {
             buscaProdutos(session, produtoEntity.entity);
-        }else{
+        } else {
             buscaCategoria(session)
         }
     }
@@ -136,7 +146,7 @@ bot.dialog('ProdutoDialog',
 
 bot.dialog('AtendimentoDialog',
     (session) => {
-        
+
         session.send('You reached the Atendimento intent. You said \'%s\'.', session.message.text);
         session.endDialog();
     }
@@ -165,7 +175,7 @@ const buscaCategoria = (session) => {
             .attachmentLayout(builder.AttachmentLayout.carousel)
             .attachments(cards);
         session.send(reply);
-        
+
     }).catch(err => (console.log(err)));
 }
 
@@ -173,21 +183,27 @@ const buscaCategoria = (session) => {
 const buscaProdutos = (session, text) => {
     Produto.find({})
         .or([{
-            nome: new RegExp(text, 'i')
-        }, {
-            categoria: new RegExp(text, 'i')
-        }, {
-            sinonimos: new RegExp(text, 'i')
-        }])
+                nome: new RegExp(text, 'i')
+            }, {
+                "categoria.sinonimos": new RegExp(text, 'i')
+            }, {
+                "categoria.nome": new RegExp(text, 'i')
+            }, {
+                sinonimos: new RegExp(text, 'i')
+            }
+        ])
         .then(produtos => {
             var cards = [];
-            console.log(produtos)
-            if(produtos.length > 0){
+            
+            if (produtos.length > 0) {
                 produtos.forEach(produto => {
+                    console.log("produto.imagem"+produto.imagem)
+                    console.log("produto."+produto.descricao)
+                    console.log("produto."+produto.categoria)
                     cards.push(
                         new builder.HeroCard(session)
                         .title(produto.nome)
-                        .subtitle('Offload the heavy lifting of data center management')
+                        .subtitle(produto.descricao)
                         .images([
                             builder.CardImage.create(session, produto.imagem)
                         ])
@@ -197,11 +213,8 @@ const buscaProdutos = (session, text) => {
                     .attachmentLayout(builder.AttachmentLayout.carousel)
                     .attachments(cards);
                 session.send(reply);
-            }else{
+            } else {
                 session.send(`Não encontramos nenhum produto com ${text}, tente navegar nas 'Categorias'`)
             }
-
-
         }).catch(err => (console.log("console Lucas err" + err)));
 }
-
