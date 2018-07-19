@@ -48,7 +48,7 @@ var bot = new builder.UniversalBot(connector, function (session, args) {
 
 // LINK com o luis
 const LuisModelUrl = process.env.LUIS_MODEL_URL;
-
+console.log(`luis string de conexao: ${process.env.LUIS_MODEL_URL}`)
 // Create a recognizer that gets intents from LUIS, and add it to the bot
 var recognizer = new builder.LuisRecognizer(LuisModelUrl);
 bot.recognizer(recognizer);
@@ -145,9 +145,26 @@ bot.dialog('ProdutoDialog',
 })
 
 bot.dialog('AtendimentoDialog',
-    (session) => {
-
-        session.send('You reached the Atendimento intent. You said \'%s\'.', session.message.text);
+    (session, args) => {
+        var atendimentoEntity = builder.EntityRecognizer.findEntity(args.intent.entities, 'tipoAtendimento');
+        console.log(atendimentoEntity.entity)
+        switch(atendimentoEntity.entity){
+            case "garçom":
+            case "garcom":
+            case "atentente":
+                session.send(`Intenção pedir garçom`)
+            break
+            case "conta":
+            case "finalizar":
+                session.send(`intenção pedir a conta`)
+            break
+            case "pedido":
+                session.send(`intenção realizar pedido`)
+            break
+            default:
+                session.send(`Opção`)
+            break
+        }
         session.endDialog();
     }
 ).triggerAction({
