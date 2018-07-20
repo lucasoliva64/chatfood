@@ -57,7 +57,7 @@ bot.set('storage', new builder.MemoryBotStorage())
 
 // Add a dialog for each intent that the LUIS app recognizes.
 // See https://docs.microsoft.com/en-us/bot-framework/nodejs/bot-builder-nodejs-recognize-intent-luis 
-bot.dialog('CumprimentoDialog', [
+bot.dialog('CumprimentoDialog',
     (session) => {
         var lepingue = 'lepingue'
         console.log(new RegExp(lepingue, 'i'));
@@ -67,56 +67,221 @@ bot.dialog('CumprimentoDialog', [
         }, 'nome', (function (err, estabelecimento) {
             if (err) return console.error(err);
             session.send('Olá, Bem-Vindo a %s.', estabelecimento.nome);
-            builder.Prompts.text(session, 'Qual o seu Nome?')
-        }));
-    },
-    (session, results) => {
-        session.userData.nome = results.response;
-        session.send(`Em que posso te ajudar, ${session.userData.nome} 
+            session.send(`Em que posso te ajudar, ${session.userData.nome} 
             Eu Posso fazer essas coisas:
                 * Te mostrar o Cardapio 
                 * Chamar um Garçom`);
-        session.beginDialog("PedidoDialog")
+                 
+            //somente pra testar pedidio dialog
+            session.beginDialog("PedidoDialog")
+        }));
     }
-]).triggerAction({
+).triggerAction({
     matches: 'Cumprimento'
 })
+
+
 bot.dialog('PedidoDialog', [
     (session, args, next) => {
-        if (session.userData.nome == null) {
-            builder.Prompts.text(session, 'Qual o seu Nome?')
-        } else {
+        if (session.message && session.message.value) {
+            // A Card's Submit Action obj was received
+            session.userData.nome == session.message.value.nome;
+            session.userData.sobrenome == session.message.value.sobrenome;
             next({
-                response: session.userData.nome
-            })
+                response: session.message.value
+            });
+
+            
+            return;
         }
+        var card = {
+            'contentType': 'application/vnd.microsoft.card.adaptive',
+            'content': {
+                "type": "AdaptiveCard",
+                "body": [{
+                        "type": "TextBlock",
+                        "text": "Precisamos de alguns dados antes de prosseguir",
+                        "weight": "bolder"
+                    },
+                    {
+                        "type": "Input.Text",
+                        "id": "nome",
+                        "placeholder": "Qual o seu Primeiro Nome?"
+                    },
+                    {
+                        "type": "Input.Text",
+                        "id": "sobrenome",
+                        "placeholder": "Qual seu Sobrenome?"
+                    }
+                ],
+                "actions": [{
+                    "type": "Action.Submit",
+                    "title": "Enviar",
+                    "data": {
+                        "x": 13
+                    }
+                }]
+            }
+        };
+
+        var msg = new builder.Message(session)
+            .addAttachment(card);
+        session.send(msg);
+
     },
     (session, results, next) => {
-        session.userData.nome = results.response;
+        session.send(`os seus dados são nome: ${results.response.nome} ${session.message.value.sobrenome}`);
+
         if (session.userData.mesa == null) {
             builder.Prompts.text(session, 'Poderia me informar qual a sua mesa?');
         } else {
             next();
         }
     },
+
     (session, results, next) => {
         if (session.userData.mesa == null) {
             session.userData.mesa = results.response;
         }
         console.log(session.userData.mesa);
-    
-        Mesas.findOne({key: session.userData.mesa}).then(mesa =>{
+        /// Busca o codigo da mesa e checa o status se for = 0 cadastra o cliente na mesa com o nome sobrenome(intenção ser temporario)
+        Mesas.findOne({
+            key: session.userData.mesa
+        }).then(mesa => {
             console.log(mesa)
-            if(mesa.status == 0 || mesa.nome == session.userData.nome){             
-                console.log('update nome');
+            if (mesa.status == 0 || mesa.nome == session.userData.nome) {
+                //realizar update na mesa
                 buscaCategoria(session);
-                next();
-            }else{
+                next({
+                    response: session.userData.mesa
+                });
+            } else {
+                //como retornar um passo?
                 session.send(`Entre com uma mesa valida e dísponivel`);
             }
         })
 
-  
+
+    },
+    (session, results) => {
+        
+
+        var card = {
+            'contentType': 'application/vnd.microsoft.card.adaptive',
+            'content': {
+                'type': 'AdaptiveCard',
+                'body': [{
+                    'type': 'Container',
+                    'speak': '<s>Hello!</s><s>Are you looking for a flight or a hotel?</s>',
+                    'items': [{
+                        'type': 'ColumnSet',
+                        'columns': [{
+                                'type': 'Column',
+                                'size': 'auto',
+                                'items': [{
+                                    'type': 'Image',
+                                    'url': 'https://placeholdit.imgix.net/~text?txtsize=65&txt=Adaptive+Cards&w=300&h=300',
+                                    'size': 'medium',
+                                    'style': 'person'
+                                }]
+                            },
+                            {
+                                'type': 'Column',
+                                'size': 'stretch',
+                                'items': [{
+                                        'type': 'TextBlock',
+                                        'text': 'Hello!',
+                                        'weight': 'bolder',
+                                        'isSubtle': true
+                                    },
+                                    {
+                                        'type': 'TextBlock',
+                                        'text': 'Are you looking for a flight or a hotel?',
+                                        'wrap': true
+                                    }
+                                ]
+                            }
+                        ]
+                    }]
+                }],
+                'actions': [
+                    // Hotels Search form
+                    {
+                        'type': 'Action.ShowCard',
+                        'title': 'Hotels',
+                        'speak': '<s>Hotels</s>',
+                        'card': {
+                            'type': 'AdaptiveCard',
+                            'body': [{
+                                    'type': 'TextBlock',
+                                    'text': 'Welcome to the Hotels finder!',
+                                    'speak': '<s>Welcome to the Hotels finder!</s>',
+                                    'weight': 'bolder',
+                                    'size': 'large'
+                                },
+                                {
+                                    'type': 'TextBlock',
+                                    'text': 'Please enter your destination:'
+                                },
+                                {
+                                    'type': 'Input.Text',
+                                    'id': 'destination',
+                                    'speak': '<s>Please enter your destination</s>',
+                                    'placeholder': 'Miami, Florida',
+                                    'style': 'text'
+                                },
+                                {
+                                    'type': 'TextBlock',
+                                    'text': 'When do you want to check in?'
+                                },
+                                {
+                                    'type': 'Input.Date',
+                                    'id': 'checkin',
+                                    'speak': '<s>When do you want to check in?</s>'
+                                },
+                                {
+                                    'type': 'TextBlock',
+                                    'text': 'How many nights do you want to stay?'
+                                },
+                                {
+                                    'type': 'Input.Number',
+                                    'id': 'nights',
+                                    'min': 1,
+                                    'max': 60,
+                                    'speak': '<s>How many nights do you want to stay?</s>'
+                                }
+                            ],
+                            'actions': [{
+                                'type': 'Action.Submit',
+                                'title': 'Search',
+                                'speak': '<s>Search</s>',
+                                'data': {
+                                    'type': 'hotelSearch'
+                                }
+                            }]
+                        }
+                    },
+                    {
+                        'type': 'Action.ShowCard',
+                        'title': 'Flights',
+                        'speak': '<s>Flights</s>',
+                        'card': {
+                            'type': 'AdaptiveCard',
+                            'body': [{
+                                'type': 'TextBlock',
+                                'text': 'Flights is not implemented =(',
+                                'speak': '<s>Flights is not implemented</s>',
+                                'weight': 'bolder'
+                            }]
+                        }
+                    }
+                ]
+            }
+        };
+
+        var msg = new builder.Message(session)
+            .addAttachment(card);
+        session.send(msg);
     }
 
 ]).triggerAction({
@@ -148,22 +313,22 @@ bot.dialog('AtendimentoDialog',
     (session, args) => {
         var atendimentoEntity = builder.EntityRecognizer.findEntity(args.intent.entities, 'tipoAtendimento');
         console.log(atendimentoEntity.entity)
-        switch(atendimentoEntity.entity){
+        switch (atendimentoEntity.entity) {
             case "garçom":
             case "garcom":
             case "atentente":
                 session.send(`Intenção pedir garçom`)
-            break
+                break
             case "conta":
             case "finalizar":
                 session.send(`intenção pedir a conta`)
-            break
+                break
             case "pedido":
                 session.send(`intenção realizar pedido`)
-            break
+                break
             default:
                 session.send(`Opção`)
-            break
+                break
         }
         session.endDialog();
     }
@@ -200,23 +365,22 @@ const buscaCategoria = (session) => {
 const buscaProdutos = (session, text) => {
     Produto.find({})
         .or([{
-                nome: new RegExp(text, 'i')
-            }, {
-                "categoria.sinonimos": new RegExp(text, 'i')
-            }, {
-                "categoria.nome": new RegExp(text, 'i')
-            }, {
-                sinonimos: new RegExp(text, 'i')
-            }
-        ])
+            nome: new RegExp(text, 'i')
+        }, {
+            "categoria.sinonimos": new RegExp(text, 'i')
+        }, {
+            "categoria.nome": new RegExp(text, 'i')
+        }, {
+            sinonimos: new RegExp(text, 'i')
+        }])
         .then(produtos => {
             var cards = [];
-            
+
             if (produtos.length > 0) {
                 produtos.forEach(produto => {
-                    console.log("produto.imagem"+produto.imagem)
-                    console.log("produto."+produto.descricao)
-                    console.log("produto."+produto.categoria)
+                    console.log("produto.imagem" + produto.imagem)
+                    console.log("produto." + produto.descricao)
+                    console.log("produto." + produto.categoria)
                     cards.push(
                         new builder.HeroCard(session)
                         .title(produto.nome)
