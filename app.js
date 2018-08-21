@@ -112,6 +112,11 @@ bot.dialog('PedidoDialog', [
                         "type": "Input.Text",
                         "id": "sobrenome",
                         "placeholder": "Qual seu Sobrenome?"
+                    },
+                    {
+                        "type": "Input.Text",
+                        "id": "telefone",
+                        "placeholder": "Telefone para contato?"
                     }
                 ],
                 "actions": [{
@@ -130,7 +135,7 @@ bot.dialog('PedidoDialog', [
 
     },
     (session, results, next) => {
-        session.send(`os seus dados são nome: ${results.response.nome} ${session.message.value.sobrenome}`);
+        session.send(`os seus dados são nome: ${results.response.nome}, ${session.message.value.sobrenome}, ${session.message.value.telefone} `);
 
         if (session.userData.mesa == null) {
             builder.Prompts.text(session, 'Poderia me informar qual a sua mesa?');
@@ -159,129 +164,115 @@ bot.dialog('PedidoDialog', [
                 //como retornar um passo?
                 session.send(`Entre com uma mesa valida e dísponivel`);
             }
-        })
+        }).catch();
 
 
     },
     (session, results) => {
-        
+        buscaCategoria(session);
+        builder.Prompts.text(session, 'Escolha a categoria');
 
-        var card = {
-            'contentType': 'application/vnd.microsoft.card.adaptive',
-            'content': {
-                'type': 'AdaptiveCard',
-                'body': [{
-                    'type': 'Container',
-                    'speak': '<s>Hello!</s><s>Are you looking for a flight or a hotel?</s>',
-                    'items': [{
-                        'type': 'ColumnSet',
-                        'columns': [{
-                                'type': 'Column',
-                                'size': 'auto',
-                                'items': [{
-                                    'type': 'Image',
-                                    'url': 'https://placeholdit.imgix.net/~text?txtsize=65&txt=Adaptive+Cards&w=300&h=300',
-                                    'size': 'medium',
-                                    'style': 'person'
-                                }]
-                            },
-                            {
-                                'type': 'Column',
-                                'size': 'stretch',
-                                'items': [{
-                                        'type': 'TextBlock',
-                                        'text': 'Hello!',
-                                        'weight': 'bolder',
-                                        'isSubtle': true
-                                    },
-                                    {
-                                        'type': 'TextBlock',
-                                        'text': 'Are you looking for a flight or a hotel?',
-                                        'wrap': true
-                                    }
-                                ]
-                            }
-                        ]
-                    }]
-                }],
-                'actions': [
-                    // Hotels Search form
-                    {
-                        'type': 'Action.ShowCard',
-                        'title': 'Hotels',
-                        'speak': '<s>Hotels</s>',
-                        'card': {
-                            'type': 'AdaptiveCard',
-                            'body': [{
-                                    'type': 'TextBlock',
-                                    'text': 'Welcome to the Hotels finder!',
-                                    'speak': '<s>Welcome to the Hotels finder!</s>',
-                                    'weight': 'bolder',
-                                    'size': 'large'
-                                },
+        
+    },
+    (session, results) => {
+
+        card = {
+            "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+            "type": "AdaptiveCard",
+            "version": "1.0",
+            "body": [
+                {
+                    "type": "TextBlock",
+                    "text": "Adaptive Card design session",
+                    "size": "large",
+                    "weight": "bolder"
+                },
+                {
+                    "type": "TextBlock",
+                    "text": "Conf Room 112/3377 (10)",
+                    "isSubtle": true
+                },
+                {
+                    "type": "ColumnSet",
+                    "columns": [
+                        {
+                            "type": "Column",
+                            "width": "20",
+                            "items": [
                                 {
-                                    'type': 'TextBlock',
-                                    'text': 'Please enter your destination:'
-                                },
-                                {
-                                    'type': 'Input.Text',
-                                    'id': 'destination',
-                                    'speak': '<s>Please enter your destination</s>',
-                                    'placeholder': 'Miami, Florida',
-                                    'style': 'text'
-                                },
-                                {
-                                    'type': 'TextBlock',
-                                    'text': 'When do you want to check in?'
-                                },
-                                {
-                                    'type': 'Input.Date',
-                                    'id': 'checkin',
-                                    'speak': '<s>When do you want to check in?</s>'
-                                },
-                                {
-                                    'type': 'TextBlock',
-                                    'text': 'How many nights do you want to stay?'
-                                },
-                                {
-                                    'type': 'Input.Number',
-                                    'id': 'nights',
-                                    'min': 1,
-                                    'max': 60,
-                                    'speak': '<s>How many nights do you want to stay?</s>'
+                                    "type": "Image",
+                                    "size": "auto",
+                                    "url": "http://messagecardplayground.azurewebsites.net/assets/Mostly%20Cloudy-Square.png"
                                 }
                             ],
-                            'actions': [{
-                                'type': 'Action.Submit',
-                                'title': 'Search',
-                                'speak': '<s>Search</s>',
-                                'data': {
-                                    'type': 'hotelSearch'
+                            "selectAction": {
+                                "type": "Action.OpenUrl",
+                                "title": "View Friday",
+                                "url": "http://www.microsoft.com"
+                            }
+                        }
+                    ]
+                }
+            ],
+            "actions": [
+                {
+                    "type": "Action.ShowCard",
+                    "title": "Steak",
+                    "card": {
+                        "type": "AdaptiveCard",
+                        "body": [
+                            {
+                                "type": "TextBlock",
+                                "text": "How would you like your steak prepared?",
+                                "size": "medium",
+                                "wrap": true
+                            },
+                            {
+                                "type": "Input.ChoiceSet",
+                                "id": "SteakTemp",
+                                "style": "expanded",
+                                "choices": [
+                                    {
+                                        "title": "Rare",
+                                        "value": "rare"
+                                    },
+                                    {
+                                        "title": "Medium-Rare",
+                                        "value": "medium-rare"
+                                    },
+                                    {
+                                        "title": "Well-done",
+                                        "value": "well-done"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "Input.Text",
+                                "id": "SteakOther",
+                                "isMultiline": true,
+                                "placeholder": "Any other preparation requestes?"
+                            }
+                        ],
+                        "actions": [
+                            {
+                                "type": "Action.Submit",
+                                "title": "OK",
+                                "data": {
+                                    "FoodChoice": "Steak"
                                 }
-                            }]
-                        }
-                    },
-                    {
-                        'type': 'Action.ShowCard',
-                        'title': 'Flights',
-                        'speak': '<s>Flights</s>',
-                        'card': {
-                            'type': 'AdaptiveCard',
-                            'body': [{
-                                'type': 'TextBlock',
-                                'text': 'Flights is not implemented =(',
-                                'speak': '<s>Flights is not implemented</s>',
-                                'weight': 'bolder'
-                            }]
-                        }
+                            }
+                        ]
                     }
-                ]
-            }
-        };
+                }
+            ]
+        }
 
-        var msg = new builder.Message(session)
-            .addAttachment(card);
-        session.send(msg);
+        var reply = new builder.Message(session)
+            .attachments(card);
+        session.send(reply);
+
+        
+
     }
 
 ]).triggerAction({
