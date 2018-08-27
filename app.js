@@ -71,7 +71,7 @@ bot.dialog('CumprimentoDialog',
             Eu Posso fazer essas coisas:
                 * Te mostrar o Cardapio 
                 * Chamar um Garçom`);
-                 
+
             //somente pra testar pedidio dialog
             session.beginDialog("PedidoDialog")
         }));
@@ -83,6 +83,22 @@ bot.dialog('CumprimentoDialog',
 
 bot.dialog('PedidoDialog', [
     (session, args, next) => {
+
+        if (session.message && session.message.value) {
+            
+
+            next({
+                response: session.message.value
+            });
+
+
+            return;
+        }
+
+        montaCardPedido(session, session.userData.comprar)
+    },
+    (session, args, next) => {
+
         if (session.message && session.message.value) {
             // A Card's Submit Action obj was received
             session.userData.nome == session.message.value.nome;
@@ -91,7 +107,7 @@ bot.dialog('PedidoDialog', [
                 response: session.message.value
             });
 
-            
+
             return;
         }
         var card = {
@@ -172,106 +188,12 @@ bot.dialog('PedidoDialog', [
         buscaCategoria(session);
         builder.Prompts.text(session, 'Escolha a categoria');
 
-        
+
     },
     (session, results) => {
 
-        card = {
-            "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
-            "type": "AdaptiveCard",
-            "version": "1.0",
-            "body": [
-                {
-                    "type": "TextBlock",
-                    "text": "Adaptive Card design session",
-                    "size": "large",
-                    "weight": "bolder"
-                },
-                {
-                    "type": "TextBlock",
-                    "text": "Conf Room 112/3377 (10)",
-                    "isSubtle": true
-                },
-                {
-                    "type": "ColumnSet",
-                    "columns": [
-                        {
-                            "type": "Column",
-                            "width": "20",
-                            "items": [
-                                {
-                                    "type": "Image",
-                                    "size": "auto",
-                                    "url": "http://messagecardplayground.azurewebsites.net/assets/Mostly%20Cloudy-Square.png"
-                                }
-                            ],
-                            "selectAction": {
-                                "type": "Action.OpenUrl",
-                                "title": "View Friday",
-                                "url": "http://www.microsoft.com"
-                            }
-                        }
-                    ]
-                }
-            ],
-            "actions": [
-                {
-                    "type": "Action.ShowCard",
-                    "title": "Steak",
-                    "card": {
-                        "type": "AdaptiveCard",
-                        "body": [
-                            {
-                                "type": "TextBlock",
-                                "text": "How would you like your steak prepared?",
-                                "size": "medium",
-                                "wrap": true
-                            },
-                            {
-                                "type": "Input.ChoiceSet",
-                                "id": "SteakTemp",
-                                "style": "expanded",
-                                "choices": [
-                                    {
-                                        "title": "Rare",
-                                        "value": "rare"
-                                    },
-                                    {
-                                        "title": "Medium-Rare",
-                                        "value": "medium-rare"
-                                    },
-                                    {
-                                        "title": "Well-done",
-                                        "value": "well-done"
-                                    }
-                                ]
-                            },
-                            {
-                                "type": "Input.Text",
-                                "id": "SteakOther",
-                                "isMultiline": true,
-                                "placeholder": "Any other preparation requestes?"
-                            }
-                        ],
-                        "actions": [
-                            {
-                                "type": "Action.Submit",
-                                "title": "OK",
-                                "data": {
-                                    "FoodChoice": "Steak"
-                                }
-                            }
-                        ]
-                    }
-                }
-            ]
-        }
 
-        var reply = new builder.Message(session)
-            .attachments(card);
-        session.send(reply);
-
-        
+        montaCardPedido();
 
     }
 
@@ -289,6 +211,14 @@ bot.dialog('CardapioDialog',
 
 bot.dialog('ProdutoDialog',
     (session, args) => {
+        spt = session.message.text.split(" ");
+        if (spt[0] == "Comprar") {
+            var produtoEntity = builder.EntityRecognizer.findEntity(args.intent.entities, 'Produto');
+            session.userData.comprar = produtoEntity.entity;
+            console.log(session.userData.comprar)
+            session.beginDialog("PedidoDialog")
+        }
+
         var produtoEntity = builder.EntityRecognizer.findEntity(args.intent.entities, 'produto');
         if (produtoEntity) {
             buscaProdutos(session, produtoEntity.entity);
@@ -296,6 +226,9 @@ bot.dialog('ProdutoDialog',
             buscaCategoria(session)
         }
     }
+
+
+
 ).triggerAction({
     matches: "Produto"
 })
@@ -352,6 +285,81 @@ const buscaCategoria = (session) => {
     }).catch(err => (console.log(err)));
 }
 
+const montaCardPedido = (session, produto) => {
+
+    Produto.findOne({
+            nome: new RegExp(produto, 'i')
+        })
+        .then(pedido => {
+            card = {
+                'contentType': 'application/vnd.microsoft.card.adaptive',
+                'content': {
+                    'type': 'AdaptiveCard',
+                    "body": [{
+                            "type": "TextBlock",
+                            "text": pedido.nome,
+                            "size": "large",
+                            "weight": "bolder"
+                        },
+                        {
+                            "type": "ColumnSet",
+                            "columns": [{
+                                "type": "Column",
+                                "width": "20",
+                                "items": [{
+                                    "type": "Image",
+                                    "size": "auto",
+                                    "url": pedido.imagem
+                                }],
+                                "selectAction": {
+                                    "type": "Action.OpenUrl",
+                                    "title": "View Friday",
+                                    "url": "http://www.microsoft.com"
+                                }
+                            }]
+                        }
+                    ],
+                    "actions": [{
+                        "type": "Action.ShowCard",
+                        "title": "Detalhes do pedido",
+                        "card": {
+                            "type": "AdaptiveCard",
+                            "body": [{
+                                    "type": "TextBlock",
+                                    "text": "Alguma obsevação sobre o pedido?",
+                                    "size": "medium",
+                                    "wrap": true
+                                },
+                                {
+                                    "type": "Input.Text",
+                                    "id": "SteakOther",
+                                    "isMultiline": true,
+                                    "placeholder": "observações"
+                                }
+                            ],
+                            "actions": [{
+                                "type": "Action.Submit",
+                                "title": "OK",
+                                "data": {
+                                    "FoodChoice": "Steak"
+                                }
+                            }]
+                        }
+                    }]
+                }
+            }
+
+            var msg = new builder.Message(session)
+                .addAttachment(card);
+            session.send(msg);
+
+            var reply = new builder.Message(session)
+                .attachments(card);
+            session.send(reply);
+
+        })
+        .catch()
+}
 
 const buscaProdutos = (session, text) => {
     Produto.find({})
@@ -378,6 +386,9 @@ const buscaProdutos = (session, text) => {
                         .subtitle(produto.descricao)
                         .images([
                             builder.CardImage.create(session, produto.imagem)
+                        ])
+                        .buttons([
+                            builder.CardAction.imBack(session, `Comprar ${produto.nome}`, 'Comprar')
                         ])
                     );
                 });
