@@ -99,7 +99,7 @@ bot.dialog('CumprimentoDialog', (session) => {
         if (err) return console.error(err);
 
         var msg = new builder.Message(session)
-            .text(`Olá, Bem-Vindo ao **Le Pingue** Em que posso te ajudar?`)
+            .text(`Olá, Bem-Vindo ao **${estabelecimento.nome}** Em que posso te ajudar?`)
             .suggestedActions(
                 builder.SuggestedActions.create(
                     session, [
@@ -125,9 +125,8 @@ bot.dialog('PedidoDialog', [
             session.userData.pedido =  session.message.value.FoodChoice
             session.userData.detalhePedido =  session.message.value.observacoes
             next({
-                response: session.userData.pedido
-            });
-
+                response: session.userData.pedido 
+            })
             return;
         }
 
@@ -141,7 +140,7 @@ bot.dialog('PedidoDialog', [
                 observação: ${session.userData.detalhePedido}
         `)
 
-        if (session.message && session.message.value) {
+        if (session.message && session.message.value.nome) {
             // A Card's Submit Action obj was received
             session.userData.nome == session.message.value.nome;
             session.userData.sobrenome == session.message.value.sobrenome;
