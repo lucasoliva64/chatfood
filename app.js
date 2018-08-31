@@ -33,109 +33,86 @@ mongoose.connect(process.env.mongo_db);
 
 
 
+
+
+
 // Listen for messages from users 
+
 server.post('/api/messages', connector.listen());
 
 
+
+
+
 // Create your bot with a function to receive messages from the user
+
 // This default message handler is invoked if the user's utterance doesn't
 
+
+
 // match any intents handled by other dialogs.
+
 var bot = new builder.UniversalBot(connector, function (session, args) {
-    session.send('Não entendi o que quis dizer com \'%s\'. \n Tente alguma dessas coisas:\nPedir atendimento\nVer Cardapio\nSaber mais sobre o estabelecimento\nRealizar pedido ', session.message.text);
+
+    var msg = new builder.Message(session)
+        .text(`Não entendi o que quis dizer com \'%s\'. \n Tente alguma dessas coisas: `, session.message.text)
+        .suggestedActions(
+            builder.SuggestedActions.create(
+                session, [
+                    builder.CardAction.imBack(session, "Chamar Garçom", "Chamar Garçom"),
+                    builder.CardAction.imBack(session, "Mostrar Cardápio", "Mostrar Cardápio"),
+                    builder.CardAction.imBack(session, "Realizar Pedido", "Realizar Pedido"),
+                    builder.CardAction.imBack(session, "Informações da Loja", "Informações da Loja"),
+                ]
+            ));
+    session.send(msg);
+
 });
+
+
+
 
 
 // LINK com o luis
+
 const LuisModelUrl = process.env.LUIS_MODEL_URL;
+
 console.log(`luis string de conexao: ${process.env.LUIS_MODEL_URL}`)
+
 // Create a recognizer that gets intents from LUIS, and add it to the bot
+
 var recognizer = new builder.LuisRecognizer(LuisModelUrl);
+
 bot.recognizer(recognizer);
+
+
 
 bot.set('storage', new builder.MemoryBotStorage())
 
-var bot = new builder.UniversalBot(connector);
-/*
-bot.on('event', function(message) { 
-
-  if(message.name == 'requestWelcomeDialog'){
-    bot.beginDialog(message.address, '/');
-  }
-
-});*/
-
-//Inicia a conversa
-bot.on('conversationUpdate', function (message) {
-    if (message.membersAdded) {
-        message.membersAdded.forEach(function (identity) {
-            if (identity.id === message.address.bot.id) {
-                bot.beginDialog(message.address, '/');
-            }
-        });
-    }
-});
-
-
-//Primeira
-bot.dialog('/', [function(session, args, next) {
+bot.dialog('CumprimentoDialog', (session) => {
     var lepingue = 'lepingue'
     console.log(new RegExp(lepingue, 'i'));
-    
-    try {
-    builder.Prompts.choice(session, 
-    `Olá, ${session.userData.nome} Bem-Vindo ao **Le Pingue** Em que posso te ajudar?`, 
-    'Chamar Garçom|Mostrar Cardápio|Realizar Pedido|Informações da Loja', 
-    {listStyle: builder.ListStyle["button"]});
-    } catch (err) {}
-    },
-    function(session, results) {
-      switch (results.response.entity) {
-        case "Chamar Garçom":
-        session.replaceDialog("AtendimentoDialog");
-        break;
-        case "Mostrar Cardápio":
-        session.beginDialog("CardapioDialog");
-        break;
-      case "Realizar Pedido":
-        session.replaceDialog("CardapioDialog");
-        break;
-      case "Informações da Loja":
-        session.replaceDialog("Cumprimento");
-        break;
-      default:
-        session.replaceDialog("/");
-      break;
-      }
-    }
-    ]);     
-    
 
+    Estabelecimento.findOne({
+        nome: new RegExp(lepingue, 'i')
+    }, 'nome', (function (err, estabelecimento) {
+        if (err) return console.error(err);
 
-// Add a dialog for each intent that the LUIS app recognizes.
-// See https://docs.microsoft.com/en-us/bot-framework/nodejs/bot-builder-nodejs-recognize-intent-luis 
+        var msg = new builder.Message(session)
+            .text(`Olá, Bem-Vindo ao **Le Pingue** Em que posso te ajudar?`)
+            .suggestedActions(
+                builder.SuggestedActions.create(
+                    session, [
+                        builder.CardAction.imBack(session, "Chamar Garçom", "Chamar Garçom"),
+                        builder.CardAction.imBack(session, "Mostrar Cardápio", "Mostrar Cardápio"),
+                        builder.CardAction.imBack(session, "Realizar Pedido", "Realizar Pedido"),
+                        builder.CardAction.imBack(session, "Informações da Loja", "Informações da Loja"),
+                    ]
+                ));
+        session.send(msg);
 
-
-
-bot.dialog('CumprimentoDialog', (session) => {
-        var lepingue = 'lepingue'
-        console.log(new RegExp(lepingue, 'i'));
-
-        Estabelecimento.findOne({
-            nome: new RegExp(lepingue, 'i')
-        }, 'nome', (function (err, estabelecimento) {
-            if (err) return console.error(err);
-            session.send('Olá, Bem-Vindo a %s.', estabelecimento.nome);
-            session.send(`Em que posso te ajudar, ${session.userData.nome} 
-            Eu Posso fazer essas coisas:
-                * Te mostrar o Cardapio 
-                * Chamar um Garçom`);
-
-            //somente pra testar pedidio dialog
-            session.beginDialog("PedidoDialog")
-        }));
-    }
-).triggerAction({
+    }))
+}).triggerAction({
     matches: 'Cumprimento'
 })
 
@@ -144,12 +121,12 @@ bot.dialog('PedidoDialog', [
     (session, args, next) => {
 
         if (session.message && session.message.value) {
-            
-
+            console.log(session.message)
+            session.userData.pedido =  session.message.value.FoodChoice
+            session.userData.detalhePedido =  session.message.value.observacoes
             next({
-                response: session.message.value
+                response: session.userData.pedido
             });
-
 
             return;
         }
@@ -157,6 +134,12 @@ bot.dialog('PedidoDialog', [
         montaCardPedido(session, session.userData.comprar)
     },
     (session, args, next) => {
+
+        session.send(`
+            Dados do pedido: \n
+                item: ${session.userData.pedido},
+                observação: ${session.userData.detalhePedido}
+        `)
 
         if (session.message && session.message.value) {
             // A Card's Submit Action obj was received
@@ -242,20 +225,7 @@ bot.dialog('PedidoDialog', [
         }).catch();
 
 
-    },
-    (session, results) => {
-        buscaCategoria(session);
-        builder.Prompts.text(session, 'Escolha a categoria');
-
-
-    },
-    (session, results) => {
-
-
-        montaCardPedido();
-
     }
-
 ]).triggerAction({
     matches: 'Pedido'
 })
@@ -272,17 +242,28 @@ bot.dialog('ProdutoDialog',
     (session, args) => {
         spt = session.message.text.split(" ");
         if (spt[0] == "Comprar") {
-            var produtoEntity = builder.EntityRecognizer.findEntity(args.intent.entities, 'Produto');
-            session.userData.comprar = produtoEntity.entity;
-            console.log(session.userData.comprar)
-            session.beginDialog("PedidoDialog")
-        }
+            var produtoCompostoEntity = builder.EntityRecognizer.findEntity(args.intent.entities, 'Produto');
+            var produtoEntity = builder.EntityRecognizer.findEntity(args.intent.entities, 'produto');
+            if (produtoCompostoEntity) {
+                session.userData.comprar = produtoCompostoEntity.entity;
+            } else {
+                session.userData.comprar = produtoEntity.entity;
+            }
 
-        var produtoEntity = builder.EntityRecognizer.findEntity(args.intent.entities, 'produto');
-        if (produtoEntity) {
-            buscaProdutos(session, produtoEntity.entity);
+            console.log(session.userData.comprar)
+            session.beginDialog("PedidoDialog");
+            
         } else {
-            buscaCategoria(session)
+            
+            var produtoEntity = builder.EntityRecognizer.findEntity(args.intent.entities, 'produto');
+            console.log("produtoEntity " + produtoEntity.entity)
+            if (produtoEntity.entity) {
+                console.log("produtoEntity if" + produtoEntity.entity)
+                buscaProdutos(session, produtoEntity.entity);
+            } else {
+                console.log("produtoEntity else" + produtoEntity.entity)
+                buscaCategoria(session)
+            }
         }
     }
 
@@ -294,6 +275,7 @@ bot.dialog('ProdutoDialog',
 
 bot.dialog('AtendimentoDialog',
     (session, args) => {
+        console.log(args)
         var atendimentoEntity = builder.EntityRecognizer.findEntity(args.intent.entities, 'tipoAtendimento');
         console.log(atendimentoEntity.entity)
         switch (atendimentoEntity.entity) {
@@ -391,7 +373,7 @@ const montaCardPedido = (session, produto) => {
                                 },
                                 {
                                     "type": "Input.Text",
-                                    "id": "SteakOther",
+                                    "id": "observacoes",
                                     "isMultiline": true,
                                     "placeholder": "observações"
                                 }
@@ -400,7 +382,7 @@ const montaCardPedido = (session, produto) => {
                                 "type": "Action.Submit",
                                 "title": "OK",
                                 "data": {
-                                    "FoodChoice": "Steak"
+                                    "FoodChoice": pedido.nome
                                 }
                             }]
                         }
@@ -412,9 +394,6 @@ const montaCardPedido = (session, produto) => {
                 .addAttachment(card);
             session.send(msg);
 
-            var reply = new builder.Message(session)
-                .attachments(card);
-            session.send(reply);
 
         })
         .catch()
@@ -436,9 +415,6 @@ const buscaProdutos = (session, text) => {
 
             if (produtos.length > 0) {
                 produtos.forEach(produto => {
-                    console.log("produto.imagem" + produto.imagem)
-                    console.log("produto." + produto.descricao)
-                    console.log("produto." + produto.categoria)
                     cards.push(
                         new builder.HeroCard(session)
                         .title(produto.nome)
