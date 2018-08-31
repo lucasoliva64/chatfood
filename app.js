@@ -55,10 +55,69 @@ bot.recognizer(recognizer);
 
 bot.set('storage', new builder.MemoryBotStorage())
 
+var bot = new builder.UniversalBot(connector);
+/*
+bot.on('event', function(message) { 
+
+  if(message.name == 'requestWelcomeDialog'){
+    bot.beginDialog(message.address, '/');
+  }
+
+});*/
+
+//Inicia a conversa
+bot.on('conversationUpdate', function (message) {
+    if (message.membersAdded) {
+        message.membersAdded.forEach(function (identity) {
+            if (identity.id === message.address.bot.id) {
+                bot.beginDialog(message.address, '/');
+            }
+        });
+    }
+});
+
+
+//Primeira
+bot.dialog('/', [function(session, args, next) {
+    var lepingue = 'lepingue'
+    console.log(new RegExp(lepingue, 'i'));
+    
+    try {
+    builder.Prompts.choice(session, 
+    `Olá, ${session.userData.nome} Bem-Vindo ao **Le Pingue** Em que posso te ajudar?`, 
+    'Chamar Garçom|Mostrar Cardápio|Realizar Pedido|Informações da Loja', 
+    {listStyle: builder.ListStyle["button"]});
+    } catch (err) {}
+    },
+    function(session, results) {
+      switch (results.response.entity) {
+        case "Chamar Garçom":
+        session.replaceDialog("AtendimentoDialog");
+        break;
+        case "Mostrar Cardápio":
+        session.beginDialog("CardapioDialog");
+        break;
+      case "Realizar Pedido":
+        session.replaceDialog("CardapioDialog");
+        break;
+      case "Informações da Loja":
+        session.replaceDialog("Cumprimento");
+        break;
+      default:
+        session.replaceDialog("/");
+      break;
+      }
+    }
+    ]);     
+    
+
+
 // Add a dialog for each intent that the LUIS app recognizes.
 // See https://docs.microsoft.com/en-us/bot-framework/nodejs/bot-builder-nodejs-recognize-intent-luis 
-bot.dialog('CumprimentoDialog',
-    (session) => {
+
+
+
+bot.dialog('CumprimentoDialog', (session) => {
         var lepingue = 'lepingue'
         console.log(new RegExp(lepingue, 'i'));
 
