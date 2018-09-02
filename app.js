@@ -1,5 +1,5 @@
 require('dotenv-extended').load();
-
+//nodemon app
 var restify = require('restify');
 var builder = require('botbuilder');
 var botbuilder_azure = require("botbuilder-azure");
@@ -104,11 +104,12 @@ bot.dialog('CumprimentoDialog', (session) => {
                 builder.SuggestedActions.create(
                     session, [
                         builder.CardAction.imBack(session, "Chamar Garçom", "Chamar Garçom"),
-                        builder.CardAction.imBack(session, "Mostrar Cardápio", "Mostrar Cardápio"),
+                        builder.CardAction.imBack(session, "Mostrar Cardapio", "Mostrar Cardapio"),
                         builder.CardAction.imBack(session, "Realizar Pedido", "Realizar Pedido"),
                         builder.CardAction.imBack(session, "Informações da Loja", "Informações da Loja"),
                     ]
                 ));
+                
         session.send(msg);
 
     }))
@@ -137,8 +138,8 @@ bot.dialog('PedidoDialog', [
         session.send(`
             Dados do pedido: \n
                 item: ${session.userData.pedido},
-                observação: ${session.userData.detalhePedido}
-        `)
+                observação: ${session.userData.detalhePedido}             
+        `) //Preço: ${session.userData.detalhePedido}
 
         if (session.message && session.message.value.nome) {
             // A Card's Submit Action obj was received
@@ -308,7 +309,7 @@ const buscaCategoria = (session) => {
             cards.push(
                 new builder.HeroCard(session)
                 .title(categoria.nome)
-                .subtitle('Offload the heavy lifting of data center management')
+                //.subtitle('Offload the heavy lifting of data center management') //adicionar descrição
                 .images([
                     builder.CardImage.create(session, categoria.imagem)
                 ])
@@ -414,10 +415,13 @@ const buscaProdutos = (session, text) => {
 
             if (produtos.length > 0) {
                 produtos.forEach(produto => {
+                    var msg = (`R$${parseFloat(produto.preco).toFixed(2).replace(".",",")}`);
+                    
                     cards.push(
-                        new builder.HeroCard(session)
+                        new builder.HeroCard(session)                      
                         .title(produto.nome)
-                        .subtitle(produto.descricao)
+                        .subtitle(produto.descricao)                    
+                        .text(msg.bold().big())
                         .images([
                             builder.CardImage.create(session, produto.imagem)
                         ])
