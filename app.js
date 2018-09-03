@@ -30,25 +30,14 @@ db.once('open', function () {});
 
 mongoose.connect(process.env.mongo_db);
 
-
-
-
-
-
-
 // Listen for messages from users 
 
 server.post('/api/messages', connector.listen());
 
 
-
-
-
 // Create your bot with a function to receive messages from the user
 
 // This default message handler is invoked if the user's utterance doesn't
-
-
 
 // match any intents handled by other dialogs.
 
@@ -68,10 +57,6 @@ var bot = new builder.UniversalBot(connector, function (session, args) {
     session.send(msg);
 
 });
-
-
-
-
 
 // LINK com o luis
 
@@ -109,7 +94,7 @@ bot.dialog('CumprimentoDialog', (session) => {
                         builder.CardAction.imBack(session, "Informações da Loja", "Informações da Loja"),
                     ]
                 ));
-                
+
         session.send(msg);
 
     }))
@@ -121,114 +106,71 @@ bot.dialog('CumprimentoDialog', (session) => {
 bot.dialog('PedidoDialog', [
     (session, args, next) => {
 
-        if (session.message && session.message.value) {
-            console.log(session.message)
-            session.userData.pedido =  session.message.value.FoodChoice
-            session.userData.detalhePedido =  session.message.value.observacoes
-            next({
-                response: session.userData.pedido 
+        session.beginDialog("confirmaProduto", session.userData.comprar)
+
+        itens = new Array();
+        if (session.userData.pedidos) {
+            session.userData.pedidos.forEach(produto => {
+                console.log(produto)
+                itens.push(` \n`
+                + `* Nome: ${produto.Nome}\n` 
+                + `* Preço: ${produto.Preco}\n`)
             })
-            return;
+            session.send(`Dados do pedido:\n`
+            + itens)
         }
 
-        montaCardPedido(session, session.userData.comprar)
-    },
-    (session, args, next) => {
-
-        session.send(`
-            Dados do pedido: \n
-                item: ${session.userData.pedido},
-                observação: ${session.userData.detalhePedido}             
-        `) //Preço: ${session.userData.detalhePedido}
-
-        if (session.message && session.message.value.nome) {
-            // A Card's Submit Action obj was received
-            session.userData.nome == session.message.value.nome;
-            session.userData.sobrenome == session.message.value.sobrenome;
-            next({
-                response: session.message.value
-            });
-
-
-            return;
-        }
-        var card = {
-            'contentType': 'application/vnd.microsoft.card.adaptive',
-            'content': {
-                "type": "AdaptiveCard",
-                "body": [{
-                        "type": "TextBlock",
-                        "text": "Precisamos de alguns dados antes de prosseguir",
-                        "weight": "bolder"
-                    },
-                    {
-                        "type": "Input.Text",
-                        "id": "nome",
-                        "placeholder": "Qual o seu Primeiro Nome?"
-                    },
-                    {
-                        "type": "Input.Text",
-                        "id": "sobrenome",
-                        "placeholder": "Qual seu Sobrenome?"
-                    },
-                    {
-                        "type": "Input.Text",
-                        "id": "telefone",
-                        "placeholder": "Telefone para contato?"
-                    }
-                ],
-                "actions": [{
-                    "type": "Action.Submit",
-                    "title": "Enviar",
-                    "data": {
-                        "x": 13
-                    }
-                }]
-            }
-        };
-
-        var msg = new builder.Message(session)
-            .addAttachment(card);
-        session.send(msg);
-
+        builder.Prompt.text(session, 'Qual sua mesa?')
     },
     (session, results, next) => {
         session.send(`os seus dados são nome: ${results.response.nome}, ${session.message.value.sobrenome}, ${session.message.value.telefone} `);
-
-        if (session.userData.mesa == null) {
-            builder.Prompts.text(session, 'Poderia me informar qual a sua mesa?');
-        } else {
-            next();
-        }
-    },
-
-    (session, results, next) => {
-        if (session.userData.mesa == null) {
-            session.userData.mesa = results.response;
-        }
-        console.log(session.userData.mesa);
-        /// Busca o codigo da mesa e checa o status se for = 0 cadastra o cliente na mesa com o nome sobrenome(intenção ser temporario)
-        Mesas.findOne({
-            key: session.userData.mesa
-        }).then(mesa => {
-            console.log(mesa)
-            if (mesa.status == 0 || mesa.nome == session.userData.nome) {
-                //realizar update na mesa
-                buscaCategoria(session);
-                next({
-                    response: session.userData.mesa
-                });
-            } else {
-                //como retornar um passo?
-                session.send(`Entre com uma mesa valida e dísponivel`);
-            }
-        }).catch();
-
-
     }
 ]).triggerAction({
     matches: 'Pedido'
 })
+
+bot.dialog('confirmaProduto', [
+    (session, args) => {
+        Produto.findOne({
+                nome: new RegExp(args, 'i')
+            })
+            .then(pedido => {
+                if (args && session.userData.pedidos) {
+                    session.send("novo")
+                    session.userData.pedidos.push({
+                        Nome: pedido.nome,
+                        Preco: pedido.preco
+                    })
+            
+                } else {
+                    // New order
+                    // Using the conversationData to store the orders
+                    session.userData.pedidos = new Array();
+                    session.userData.pedidos.push({
+                        Nome: pedido.nome,
+                        Preco: pedido.preco
+                    })
+                }
+
+                var msg = `Seu pedido é: ${pedido.nome} em um total R$${pedido.preco}. está certo?`;
+            
+                builder.Prompts.confirm(session, msg)
+            })
+            .catch()
+    },
+    (session, results) => {
+        console.log(results)
+        if (results.response == true) {
+            console.log(session.userData.pedidos)
+            session.send('obrigado')
+        } else {
+            session.send('não tem problema')
+            console.log(session.userData.pedidos)
+            session.userData.pedidos.pop();
+            console.log(session.userData.pedidos)
+        }
+    },
+])
 
 bot.dialog('CardapioDialog',
     (session, args, next) => {
@@ -252,9 +194,9 @@ bot.dialog('ProdutoDialog',
 
             console.log(session.userData.comprar)
             session.beginDialog("PedidoDialog");
-            
+
         } else {
-            
+
             var produtoEntity = builder.EntityRecognizer.findEntity(args.intent.entities, 'produto');
             console.log("produtoEntity " + produtoEntity.entity)
             if (produtoEntity.entity) {
@@ -266,9 +208,6 @@ bot.dialog('ProdutoDialog',
             }
         }
     }
-
-
-
 ).triggerAction({
     matches: "Produto"
 })
@@ -326,75 +265,17 @@ const buscaCategoria = (session) => {
     }).catch(err => (console.log(err)));
 }
 
-const montaCardPedido = (session, produto) => {
+const buscaProduto = (produto, res) => {
 
     Produto.findOne({
             nome: new RegExp(produto, 'i')
         })
         .then(pedido => {
-            card = {
-                'contentType': 'application/vnd.microsoft.card.adaptive',
-                'content': {
-                    'type': 'AdaptiveCard',
-                    "body": [{
-                            "type": "TextBlock",
-                            "text": pedido.nome,
-                            "size": "large",
-                            "weight": "bolder"
-                        },
-                        {
-                            "type": "ColumnSet",
-                            "columns": [{
-                                "type": "Column",
-                                "width": "20",
-                                "items": [{
-                                    "type": "Image",
-                                    "size": "auto",
-                                    "url": pedido.imagem
-                                }],
-                                "selectAction": {
-                                    "type": "Action.OpenUrl",
-                                    "title": "View Friday",
-                                    "url": "http://www.microsoft.com"
-                                }
-                            }]
-                        }
-                    ],
-                    "actions": [{
-                        "type": "Action.ShowCard",
-                        "title": "Detalhes do pedido",
-                        "card": {
-                            "type": "AdaptiveCard",
-                            "body": [{
-                                    "type": "TextBlock",
-                                    "text": "Alguma obsevação sobre o pedido?",
-                                    "size": "medium",
-                                    "wrap": true
-                                },
-                                {
-                                    "type": "Input.Text",
-                                    "id": "observacoes",
-                                    "isMultiline": true,
-                                    "placeholder": "observações"
-                                }
-                            ],
-                            "actions": [{
-                                "type": "Action.Submit",
-                                "title": "OK",
-                                "data": {
-                                    "FoodChoice": pedido.nome
-                                }
-                            }]
-                        }
-                    }]
-                }
+            this.res = {
+                nome: produto.nome,
+                preco: produto.preco,
+                descricao: produto.descricao
             }
-
-            var msg = new builder.Message(session)
-                .addAttachment(card);
-            session.send(msg);
-
-
         })
         .catch()
 }
@@ -416,11 +297,11 @@ const buscaProdutos = (session, text) => {
             if (produtos.length > 0) {
                 produtos.forEach(produto => {
                     var msg = (`R$${parseFloat(produto.preco).toFixed(2).replace(".",",")}`);
-                    
+
                     cards.push(
-                        new builder.HeroCard(session)                      
+                        new builder.HeroCard(session)
                         .title(produto.nome)
-                        .subtitle(produto.descricao)                    
+                        .subtitle(produto.descricao)
                         .text(msg.bold().big())
                         .images([
                             builder.CardImage.create(session, produto.imagem)
