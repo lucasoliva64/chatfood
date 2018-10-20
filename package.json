@@ -1,0 +1,33 @@
+{
+  "name": "luisbot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "dependencies": {
+    "adaptivecards": "^1.0.0",
+    "botbuilder": "^3.13.1",
+    "botbuilder-azure": "^3.0.4",
+    "botbuilder-facebookextension": "^1.2.4",
+    "botbuilder-mongodb": "^3.1.1",
+    "dotenv-extended": "^2.0.2",
+    "mongoose": "^5.1.7",
+    "restify": "^5.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^5.6.0",
+    "eslint-config-standard": "^12.0.0",
+    "eslint-plugin-import": "^2.14.0",
+    "eslint-plugin-node": "^7.0.1",
+    "eslint-plugin-promise": "^4.0.1",
+    "eslint-plugin-standard": "^4.0.0",
+    "request": "^2.88.0",
+    "zip-folder": "^1.0.0"
+  },
+  "scripts": {
+    "start": "nodemon app.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "publish": "node publish.js"
+  },
+  "author": "",
+  "license": "ISC"
+}

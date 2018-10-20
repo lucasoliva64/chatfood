@@ -1,0 +1,19 @@
+extends layout
+
+block content
+  h1= title
+  
+  each i in itens
+    div
+      h1= i.data.first_name +" - "+ "Mesa: "+i.data.mesa.numero
+      table
+        tr
+          th='Nome'
+          th='Preco'
+          th='Observação'
+        each val in i.data.pedidos
+          tr
+            td=val.Nome
+            td=val.Preco
+            td=val.Observacao
+    
